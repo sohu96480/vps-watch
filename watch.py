@@ -61,7 +61,9 @@ def command(args, allow_failure=False):
     except (OSError, subprocess.TimeoutExpired):
         if allow_failure: return ''
         raise RuntimeError('command unavailable: ' + args[0]) from None
-    if r.returncode and not allow_failure:
+    # journalctl returns 1 for an empty matching interval on some versions.
+    empty_journal = args[0] == 'journalctl' and r.returncode == 1 and not r.stdout.strip() and not r.stderr.strip()
+    if r.returncode and not allow_failure and not empty_journal:
         raise RuntimeError('command failed: ' + args[0])
     return r.stdout.strip()
 

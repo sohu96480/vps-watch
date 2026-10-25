@@ -26,6 +26,15 @@ class DetectionTests(unittest.TestCase):
     def setUp(self):
         spec=importlib.util.spec_from_file_location('watch',P/'watch.py')
         self.w=importlib.util.module_from_spec(spec); spec.loader.exec_module(self.w)
+    def test_empty_journal_exit_one_is_not_reader_failure(self):
+        import subprocess
+        from unittest.mock import patch
+        w=self.w
+        with patch.object(w.subprocess,'run',return_value=subprocess.CompletedProcess([],1,'','')):
+            self.assertEqual(w.command(['journalctl','-o','json']), '')
+        with patch.object(w.subprocess,'run',return_value=subprocess.CompletedProcess([],1,'','Failed to seek cursor')):
+            with self.assertRaises(RuntimeError): w.command(['journalctl','-o','json'])
+
     def test_cpu_three_samples_and_integrity(self):
         w=self.w
         self.assertTrue(hasattr(w,'evaluate'), 'evaluation missing')
