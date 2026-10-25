@@ -26,6 +26,17 @@ class DetectionTests(unittest.TestCase):
     def setUp(self):
         spec=importlib.util.spec_from_file_location('watch',P/'watch.py')
         self.w=importlib.util.module_from_spec(spec); spec.loader.exec_module(self.w)
+    def test_socks_transport_keeps_credentials_out_of_argv(self):
+        import subprocess,json
+        from unittest.mock import patch
+        c={'name':'test','token':'private-test-token','chat_id':'123','telegram_proxy':'socks5h://192.168.0.4:7890'}
+        with patch.object(self.w.subprocess,'run',return_value=subprocess.CompletedProcess([],0,json.dumps({'ok':True,'result':{'chat':{'id':123}}}),'')) as run:
+            self.assertTrue(self.w.telegram(c,'test'))
+            args=run.call_args.args[0]
+            self.assertEqual(args[0],'curl')
+            self.assertNotIn(c['token'],str(args))
+            self.assertIn(c['telegram_proxy'],run.call_args.kwargs['input'])
+
     def test_empty_journal_exit_one_is_not_reader_failure(self):
         import subprocess
         from unittest.mock import patch

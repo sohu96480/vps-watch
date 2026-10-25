@@ -73,8 +73,21 @@ def telegram(config, text):
         (config['name'] + '\n' + stamp + '\n' + text)[:3900], 'disable_web_page_preview': 'true'}).encode()
     req = urllib.request.Request('https://api.telegram.org/bot' + config['token'] + '/sendMessage', data=body)
     try:
-        with urllib.request.urlopen(req, timeout=12) as response:
-            data = json.load(response)
+        if config.get('telegram_proxy'):
+            proxy = config['telegram_proxy']
+            if urllib.parse.urlsplit(proxy).scheme not in ('socks5h', 'socks5'):
+                return False
+            # Pass token-bearing URL via stdin, never process arguments.
+            options = {'url':'https://api.telegram.org/bot'+config['token']+'/sendMessage',
+                       'proxy':proxy,'data':body.decode()}
+            curl_config = '\n'.join(k+' = '+json.dumps(v) for k,v in options.items())+'\n'
+            result = subprocess.run(['curl','--silent','--show-error','--fail','--connect-timeout','5','--max-time','15','--config','-'],
+                                    input=curl_config,capture_output=True,text=True,timeout=18)
+            if result.returncode: return False
+            data = json.loads(result.stdout)
+        else:
+            with urllib.request.urlopen(req, timeout=12) as response:
+                data = json.load(response)
         return (data.get('ok') is True and
                 str(data.get('result', {}).get('chat', {}).get('id')) == str(config['chat_id']))
     except Exception:

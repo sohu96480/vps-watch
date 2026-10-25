@@ -25,7 +25,7 @@ chmod 600 /root/my-private-watch.json
 bash /root/vps-watch-install.sh --config /root/my-private-watch.json --name '我的主机'
 ```
 
-JSON 字段：`token`、`chat_id`，可选 `name`、`services`（服务名数组）、`containers`（容器名数组）。**不要将此文件放进仓库，不要把实际 token 写进命令行、工单或截图。** 导入文件须 root 所有、不能授予组/其他用户权限。私有配置仅保存在 `/etc/vps-watch/config.json`，权限 600，目录 700。
+JSON 字段：`token`、`chat_id`，可选 `name`、`services`（服务名数组）、`containers`（容器名数组）。可选 `telegram_proxy` 设置为自己的 `socks5h://主机:端口`，仅 Telegram 通知使用 SOCKS，域名由代理解析；留空则保持直连。SOCKS 传输使用安装器已安装的 curl，Token URL 经 stdin 传入，不出现在进程参数中。**不要将此文件放进仓库，不要把实际 token 写进命令行、工单或截图。** 导入文件须 root 所有、不能授予组/其他用户权限。私有配置仅保存在 `/etc/vps-watch/config.json`，权限 600，目录 700。
 
 重复运行相同安装命令即手动更新。已有凭据、主机名、监控目标、状态和旧基线保留；`--name` 是显式修改名字。已有安装忽略 `--config`，避免更新时无意替换凭据；如需修改，root 编辑本地配置并重启服务。运行中的 `baisi-watch.service` 会让安装中止，先自行安排迁移，避免双重通知。
 
