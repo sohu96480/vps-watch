@@ -48,6 +48,37 @@ def deploy(source, root, config, start):
     return backup
 
 
+def validate_proxy(value):
+    if not isinstance(value, str): raise ValueError('telegram_proxy must be a string')
+    if not value: return value
+    try:
+        from urllib.parse import urlsplit
+        url = urlsplit(value)
+        if (url.scheme not in ('socks5h', 'socks5') or not url.hostname or
+                not url.port or url.path or url.query or url.fragment or
+                any(c.isspace() for c in value)):
+            raise ValueError()
+    except ValueError:
+        raise ValueError('代理格式错误：请填 socks5h://地址:端口 或 socks5://地址:端口（可含 URL 编码的认证信息）') from None
+    return value
+
+
+def prompt_proxy(tty):
+    while True:
+        tty.write('Telegram 通知是否使用 SOCKS5 代理？[y/N]: '); tty.flush()
+        answer = tty.readline().strip().lower()
+        if answer in ('', 'n', 'no'): return ''
+        if answer not in ('y', 'yes'):
+            tty.write('请输入 y 或 n。\n'); continue
+        while True:
+            value = getpass.getpass('代理地址（隐藏输入，例如 socks5h://127.0.0.1:7890）: ', stream=tty).strip()
+            try:
+                if not value: raise ValueError('已选择使用代理，请输入地址。')
+                return validate_proxy(value)
+            except ValueError as error:
+                tty.write(str(error)+'\n'); tty.flush()
+
+
 def validated_config(config):
     if not isinstance(config,dict): raise ValueError('config must be an object')
     for key in ('token','chat_id','name'):
@@ -58,6 +89,7 @@ def validated_config(config):
         config.setdefault(key,[])
         if not isinstance(config[key],list) or not all(isinstance(x,str) and x and not x.startswith('-') for x in config[key]):
             raise ValueError('invalid target list: '+key)
+    config['telegram_proxy'] = validate_proxy(config.get('telegram_proxy', ''))
     return config
 
 
@@ -85,7 +117,8 @@ def main():
             tty.write('主机标签: '); tty.flush(); name=tty.readline().strip()
             token=getpass.getpass('Telegram bot token: ',stream=tty)
             chat=getpass.getpass('Telegram numeric chat ID: ',stream=tty)
-        config={'name':name,'token':token,'chat_id':chat}
+            proxy=prompt_proxy(tty)
+        config={'name':name,'token':token,'chat_id':chat,'telegram_proxy':proxy}
     if args.name: config['name']=args.name
     elif not config.get('name'):
         with open('/dev/tty','r+') as tty:

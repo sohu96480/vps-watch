@@ -9,6 +9,28 @@ import unittest
 P=Path(__file__).resolve().parents[1]
 
 class InstallTests(unittest.TestCase):
+    def test_proxy_default_preserve_and_validation(self):
+        import installer as m
+        base={'token':'fixture','chat_id':'1','name':'test'}
+        self.assertEqual(m.validated_config(dict(base))['telegram_proxy'],'')
+        for proxy in ('','socks5h://127.0.0.1:7890','socks5://user:pass@host:1080'):
+            self.assertEqual(m.validated_config(dict(base,telegram_proxy=proxy))['telegram_proxy'],proxy)
+        for proxy in ('http://host:80','socks5h://host','socks5h://host:bad',None):
+            with self.assertRaises(ValueError):m.validated_config(dict(base,telegram_proxy=proxy))
+
+    def test_proxy_prompt(self):
+        import installer as m
+        import io
+        from unittest.mock import patch
+        class Terminal(io.StringIO):
+            def write(self, text): return len(text)
+        self.assertEqual(m.prompt_proxy(Terminal('\n')),'')
+        with patch.object(m.getpass,'getpass',return_value='socks5h://127.0.0.1:7890') as secret:
+            self.assertEqual(m.prompt_proxy(Terminal('y\n')),'socks5h://127.0.0.1:7890')
+            secret.assert_called_once()
+        with patch.object(m.getpass,'getpass',side_effect=['http://host:80','socks5h://host:1080']):
+            self.assertEqual(m.prompt_proxy(Terminal('y\n')),'socks5h://host:1080')
+
     def test_dry_run_supported_no_writes(self):
         self.assertTrue((P/'install.sh').exists(),'installer missing')
         with tempfile.TemporaryDirectory() as d:
