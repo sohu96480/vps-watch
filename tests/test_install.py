@@ -18,6 +18,20 @@ class InstallTests(unittest.TestCase):
         for proxy in ('http://host:80','socks5h://host','socks5h://host:bad',None):
             with self.assertRaises(ValueError):m.validated_config(dict(base,telegram_proxy=proxy))
 
+    def test_update_only_token_or_keep_all(self):
+        import installer as m
+        import io
+        from unittest.mock import patch
+        class Terminal(io.StringIO):
+            def write(self,text): return len(text)
+        old={'name':'host','token':'old-secret','chat_id':'1','telegram_proxy':'socks5h://host:1080','services':['ssh'],'containers':[]}
+        with patch.object(m.getpass,'getpass',return_value='new-secret') as secret:
+            new=m.prompt_update(dict(old),Terminal('\ny\n\n\n'))
+            self.assertEqual(new,dict(old,token='new-secret'))
+            secret.assert_called_once()
+        self.assertEqual(m.prompt_update(dict(old),Terminal('\n\n\n\n')),old)
+        with self.assertRaises(EOFError):m.prompt_update(dict(old),Terminal(''))
+
     def test_proxy_prompt(self):
         import installer as m
         import io

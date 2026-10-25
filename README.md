@@ -16,7 +16,7 @@ curl --fail --show-error --location --retry 3 --connect-timeout 10 --max-time 60
 
 上面是可审阅的安装器入口；安装器随后经 GitHub API 解析 `main` 的 40 位 commit SHA，并下载**固定 SHA** 源码归档。HTTPS/GitHub 账号信任仍是前提；这不是离线签名校验。完整本地仓库安装：`bash ./install.sh`（使用当前本地文件，不联网取新版本）。可先审阅源码再运行。
 
-仅在缺少依赖时通过 apt 安装 `python3 ca-certificates curl`，需要 root 和可用的 apt 源。已有 Python 低于 3.9 会清楚退出，不自动跨发行版升级。初次安装通过 `/dev/tty` 输入主机标签、隐藏输入的 Telegram bot token 与数字 chat ID，然后询问 `Telegram 通知是否使用 SOCKS5 代理？[y/N]`。回车或 n 使用直连，写入 `"telegram_proxy": ""`；选择 y 后隐藏输入 `socks5h://地址:端口`（可使用 URL 编码的用户名密码），格式错误会要求重填。配置始终保留该字段，方便以后自行填写；更新时保留原代理、不重复询问，旧配置缺少字段则补为空。`--config` 非交互导入同样支持该字段，不额外询问。请先向自己的 bot 发消息/将其加入目标群并赋予发送权限。
+仅在缺少依赖时通过 apt 安装 `python3 ca-certificates curl`，需要 root 和可用的 apt 源。已有 Python 低于 3.9 会清楚退出，不自动跨发行版升级。初次安装通过 `/dev/tty` 输入主机标签、隐藏输入的 Telegram bot token 与数字 chat ID，然后询问 `Telegram 通知是否使用 SOCKS5 代理？[y/N]`。回车或 n 使用直连，写入 `"telegram_proxy": ""`；选择 y 后隐藏输入 `socks5h://地址:端口`（可使用 URL 编码的用户名密码），格式错误会要求重填。配置始终保留该字段，方便以后自行填写；更新时逐项询问主机名、Bot Token、Chat ID 和代理是否修改，各项回车默认保留，敏感信息不回显；旧配置缺少代理字段则补为空。无交互终端或显式 `--non-interactive` 时保留已有配置、不询问。`--config` 非交互导入同样支持该字段，不额外询问。请先向自己的 bot 发消息/将其加入目标群并赋予发送权限。
 
 已有根用户私有 JSON 可导入，同一 bot 与 chat 可复用，不需要另建 bot：
 

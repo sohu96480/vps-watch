@@ -66,7 +66,9 @@ def validate_proxy(value):
 def prompt_proxy(tty):
     while True:
         tty.write('Telegram 通知是否使用 SOCKS5 代理？[y/N]: '); tty.flush()
-        answer = tty.readline().strip().lower()
+        answer = tty.readline()
+        if not answer: raise EOFError('代理输入中断，未执行部署')
+        answer = answer.strip().lower()
         if answer in ('', 'n', 'no'): return ''
         if answer not in ('y', 'yes'):
             tty.write('请输入 y 或 n。\n'); continue
@@ -77,6 +79,40 @@ def prompt_proxy(tty):
                 return validate_proxy(value)
             except ValueError as error:
                 tty.write(str(error)+'\n'); tty.flush()
+
+
+def ask_change(tty, label):
+    while True:
+        tty.write('是否修改'+label+'？[y/N，回车保留]: '); tty.flush()
+        answer=tty.readline()
+        if not answer: raise EOFError('配置输入中断，未执行部署')
+        answer=answer.strip().lower()
+        if answer in ('','n','no'): return False
+        if answer in ('y','yes'): return True
+        tty.write('请输入 y 或 n。\n')
+
+
+def prompt_update(config, tty):
+    config=dict(config)
+    tty.write('已检测到旧配置；以下逐项选择，默认保留。Token 和代理凭据不回显。\n')
+    for key,label in [('name','主机名称'),('token','Bot Token'),('chat_id','Chat ID'),('telegram_proxy','SOCKS5 代理设置')]:
+        if not ask_change(tty,label): continue
+        if key=='telegram_proxy':
+            config[key]=prompt_proxy(tty)
+            continue
+        while True:
+            if key=='name':
+                tty.write('新主机名称: '); tty.flush(); raw=tty.readline()
+                if not raw: raise EOFError('配置输入中断')
+                value=raw.strip()
+            else:
+                value=getpass.getpass('新'+label+'（隐藏输入）: ',stream=tty).strip()
+            if not value:
+                tty.write('不能为空，请重新输入。\n'); continue
+            if key=='chat_id' and not value.lstrip('-').isdigit():
+                tty.write('Chat ID 必须是数字，可带负号。\n'); continue
+            config[key]=value; break
+    return config
 
 
 def validated_config(config):
@@ -99,6 +135,7 @@ def main():
     p.add_argument('--rediscover',action='store_true'); p.add_argument('--replace-targets',action='store_true')
     p.add_argument('--confirm-replace-targets',action='store_true')
     p.add_argument('--dry-run',action='store_true')
+    p.add_argument('--non-interactive',action='store_true',help='preserve existing configuration without prompts')
     args=p.parse_args()
     if args.dry_run: print('DRY RUN: no writes'); return 0
     if os.geteuid()!=0: raise RuntimeError('root required')
@@ -107,12 +144,19 @@ def main():
         raise RuntimeError('baisi-watch running; aborting duplicate monitor')
     path=Path('/etc/vps-watch/config.json'); fresh=not path.exists()
     if not fresh:
-        config=watch.load(path)  # Updates never replace existing credentials/targets from --config.
+        config=watch.load(path)  # --config never silently replaces an existing configuration.
+        if not args.non_interactive:
+            try: tty=open('/dev/tty','r+')
+            except OSError:
+                print('无交互终端：保留已有配置。')
+            else:
+                with tty: config=prompt_update(config,tty)
     elif args.config:
         st=args.config.stat()
         if st.st_uid!=0 or st.st_mode & 0o077: raise RuntimeError('--config must be root owned and mode 600')
         config=watch.load(args.config)
     else:
+        if args.non_interactive: raise RuntimeError('首次非交互安装必须提供 --config 私有配置文件')
         with open('/dev/tty','r+') as tty:
             tty.write('主机标签: '); tty.flush(); name=tty.readline().strip()
             token=getpass.getpass('Telegram bot token: ',stream=tty)
