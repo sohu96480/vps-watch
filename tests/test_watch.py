@@ -74,7 +74,21 @@ class DetectionTests(unittest.TestCase):
           {'__CURSOR':'c','MESSAGE':'unrelated'}])
         events,cursor=w.parse_journal(text,None)
         self.assertEqual(cursor,'c'); self.assertEqual(len(events),1)
-        self.assertIn('1970-',events[0]); self.assertIn('成功 1',events[0]); self.assertIn('失败 1',events[0])
+        self.assertIn('1970-',events[0]); self.assertIn('SSH 登录成功',events[0]); self.assertNotIn('失败',events[0])
+
+    def test_failed_ssh_is_silent_but_advances_cursor(self):
+        import json
+        text=json.dumps({'__CURSOR':'failed','MESSAGE':'Failed password for root'})
+        self.assertEqual(self.w.parse_journal(text,None),([], 'failed'))
+
+    def test_each_success_gets_one_notification_without_key_material(self):
+        import json
+        rows=[{'__CURSOR':str(i),'__REALTIME_TIMESTAMP':'1000000',
+               'MESSAGE':'Accepted publickey for root from 1.2.3.4 port 123 ssh2: ED25519 SECRET-FINGERPRINT'} for i in range(2)]
+        events,cursor=self.w.parse_journal('\n'.join(map(json.dumps,rows)),None)
+        self.assertEqual(len(events),2)
+        self.assertIn('root',events[0]); self.assertIn('1.2.3.4',events[0])
+        self.assertNotIn('SECRET-FINGERPRINT',events[0])
 
     def test_cli_baseline_requires_confirm_and_never_overwrites(self):
         import subprocess,os,json

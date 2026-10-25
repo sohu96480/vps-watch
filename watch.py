@@ -171,21 +171,17 @@ def evaluate(s, baseline, high):
     return problems
 
 def parse_journal(text, cursor):
-    success = failure = 0
-    first = last = None
+    events = []
     for line in text.splitlines():
         if not line.startswith('{'): continue
         row = json.loads(line)
         cursor = row.get('__CURSOR', cursor)
         msg = row.get('MESSAGE','')
-        if not isinstance(msg,str): continue
-        if 'Accepted ' in msg: success += 1
-        elif 'Failed password' in msg or 'Invalid user' in msg or 'authentication failure' in msg: failure += 1
-        else: continue
+        if not isinstance(msg,str) or not msg.startswith('Accepted '): continue
         stamp = datetime.datetime.fromtimestamp(int(row.get('__REALTIME_TIMESTAMP','0'))/1000000, datetime.timezone.utc).isoformat()
-        first = first or stamp; last = stamp
-    events = []
-    if success or failure: events.append('🔐 SSH 约30秒汇总: 成功 %d / 失败 %d\n事件时间 %s 至 %s' % (success,failure,first,last))
+        # One authentication event per notification; omit key fingerprints.
+        detail = msg.split(' ssh2', 1)[0]
+        events.append('🔐 SSH 登录成功\n' + detail[:450] + '\n事件时间 ' + stamp)
     return events, cursor
 
 def journal(state):
