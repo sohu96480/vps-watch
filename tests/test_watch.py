@@ -53,6 +53,12 @@ class DetectionTests(unittest.TestCase):
         self.assertNotIn('cpu',w.evaluate(s,{'files':{'a':'old'}},2))
         self.assertIn('cpu',w.evaluate(s,{'files':{'a':'old'}},3))
         self.assertIn('files',w.evaluate(s,{'files':{'a':'old'}},3))
+    def test_maintenance_ignores_only_monitor_files(self):
+        s={'cpu':0,'memory':0,'disk':0,'files':{'/opt/vps-watch/watch.py':'new','/opt/vps-watch/__pycache__/watch.pyc':'new','/etc/vps-watch/config.json':'new'},'services':{},'containers':{},'malware':[]}
+        self.assertNotIn('files',self.w.evaluate(s,{'files':{}},0))
+        s['files']['/root/.ssh/authorized_keys']='changed'
+        self.assertIn('/root/.ssh/authorized_keys',self.w.evaluate(s,{'files':{}},0)['files'])
+
     def test_service_detection_excludes_oneshot_and_self(self):
         w=self.w
         self.assertTrue(hasattr(w,'discover'), 'discovery missing')

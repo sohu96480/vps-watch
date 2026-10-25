@@ -156,6 +156,11 @@ def sample(config, previous):
     return {'cpu':used,'memory':100*(1-mem['MemAvailable']/mem['MemTotal']), 'disk':disk,
             'services':services,'containers':containers,'malware':bad,'files':fingerprints()}, [total,idle]
 
+def maintenance_ignored(path):
+    # Integration phase: suppress only this monitor's mutable application/config.
+    return path == '/etc/vps-watch/config.json' or path == '/opt/vps-watch' or path.startswith('/opt/vps-watch/')
+
+
 def evaluate(s, baseline, high):
     problems = {}
     if high >= 3: problems['cpu'] = 'CPU 连续3个采样 >=90%%: %.1f%%' % s['cpu']
@@ -166,7 +171,7 @@ def evaluate(s, baseline, high):
     for name,status in s['containers'].items():
         if status != 'running': problems['container:'+name] = '容器 '+name+': '+status
     if s['malware']: problems['malware'] = '已知恶意特征匹配（需核实）: '+', '.join(s['malware'])
-    changed = sorted(k for k in set(s['files']) | set(baseline['files']) if s['files'].get(k) != baseline['files'].get(k))
+    changed = sorted(k for k in set(s['files']) | set(baseline['files']) if not maintenance_ignored(k) and s['files'].get(k) != baseline['files'].get(k))
     if changed: problems['files'] = '完整性变化，需人工审核，不代表必然入侵（仅路径）: '+', '.join(changed[:25])
     return problems
 
