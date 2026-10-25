@@ -1,0 +1,30 @@
+[Unit]
+Description=VPS Watch notify-only host monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/python3 -B /opt/vps-watch/watch.py
+Restart=on-failure
+RestartSec=10
+UMask=0077
+StateDirectory=vps-watch
+StateDirectoryMode=0700
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictRealtime=yes
+ReadWritePaths=/var/lib/vps-watch
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
