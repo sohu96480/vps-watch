@@ -94,13 +94,17 @@ def telegram(config, text):
         # Never log URL/exception body: Telegram embeds credentials in URLs.
         return False
 
+def session_service(name):
+    return name.startswith('user@') and name.endswith('.service') and name[5:-8].isdigit()
+
+
 def discover(run=command):
     services = []
     for line in run(['systemctl', 'list-units', '--type=service', '--state=running', '--no-legend', '--plain']).splitlines():
         parts = line.split()
         if not parts: continue
         name = parts[0]
-        if name in ('vps-watch.service', 'baisi-watch.service'): continue
+        if name in ('vps-watch.service', 'baisi-watch.service') or session_service(name): continue
         props = dict(x.split('=', 1) for x in run(['systemctl', 'show', name, '-p', 'Type', '-p', 'SubState']).splitlines() if '=' in x)
         if props.get('Type') != 'oneshot' and props.get('SubState') == 'running': services.append(name)
     containers = run(['docker', 'ps', '--format', '{{.Names}}'], allow_failure=True).splitlines()
@@ -167,7 +171,7 @@ def evaluate(s, baseline, high):
     for name in ('memory','disk'):
         if s[name] >= 90: problems[name] = name+' >=90%%: %.1f%%' % s[name]
     for name,status in s['services'].items():
-        if status != 'active': problems['service:'+name] = '服务 '+name+': '+status
+        if not session_service(name) and status != 'active': problems['service:'+name] = '服务 '+name+': '+status
     for name,status in s['containers'].items():
         if status != 'running': problems['container:'+name] = '容器 '+name+': '+status
     if s['malware']: problems['malware'] = '已知恶意特征匹配（需核实）: '+', '.join(s['malware'])

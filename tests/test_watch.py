@@ -59,6 +59,13 @@ class DetectionTests(unittest.TestCase):
         s['files']['/root/.ssh/authorized_keys']='changed'
         self.assertIn('/root/.ssh/authorized_keys',self.w.evaluate(s,{'files':{}},0)['files'])
 
+    def test_session_service_is_not_business_failure(self):
+        s={'cpu':0,'memory':0,'disk':0,'files':{},'services':{'user@0.service':'inactive','user@1000.service':'inactive','ssh.service':'inactive'},'containers':{},'malware':[]}
+        problems=self.w.evaluate(s,{'files':{}},0)
+        self.assertNotIn('service:user@0.service',problems)
+        self.assertNotIn('service:user@1000.service',problems)
+        self.assertIn('service:ssh.service',problems)
+
     def test_service_detection_excludes_oneshot_and_self(self):
         w=self.w
         self.assertTrue(hasattr(w,'discover'), 'discovery missing')
