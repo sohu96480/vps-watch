@@ -115,6 +115,23 @@ class DetectionTests(unittest.TestCase):
             self.assertNotEqual(cli('--init').returncode,0); self.assertEqual(old,baseline.read_bytes())
             self.assertNotEqual(cli('--accept-baseline').returncode,0)
             self.assertEqual(cli('--accept-baseline','--confirm').returncode,0)
+    def test_file_change_once_then_notify_new_content(self):
+        w=self.w; s=w.new_state(); baseline={'files':{'/etc/passwd':'old'}}
+        a=w.file_change_signature({'/etc/passwd':'A'},baseline)
+        b=w.file_change_signature({'/etc/passwd':'B'},baseline)
+        self.assertNotEqual(a,b)
+        w.reconcile(s,{'files':'same path'},10,a)
+        w.flush(s,lambda text:True,10)
+        import json
+        s=json.loads(json.dumps(s))
+        w.reconcile(s,{'files':'same path'},100000,a)
+        self.assertFalse(s['pending'])
+        w.reconcile(s,{'files':'same path'},100001,b)
+        self.assertEqual(len(s['pending']),1)
+        w.flush(s,lambda text:True,100001)
+        w.reconcile(s,{},100002)
+        self.assertEqual(len(s['pending']),1)
+
     def test_reminders_and_retry_backoff(self):
         w=self.w; s=w.new_state(); w.reconcile(s,{'x':'high'},10)
         w.flush(s,lambda text:False,10)

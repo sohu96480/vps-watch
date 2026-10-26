@@ -33,12 +33,16 @@ def save(path, data):
 def new_state():
     return {'alerts': {}, 'pending': [], 'cursor': None, 'high': 0, 'previous': None}
 
-def reconcile(state, problems, now):
+def reconcile(state, problems, now, file_signature=None):
     alerts = state['alerts']
     for key, text in problems.items():
-        if key not in alerts or now - alerts[key]['queued'] >= 900:
+        if (key not in alerts or
+                (key == 'files' and file_signature is not None and alerts[key].get('signature') != file_signature) or
+                (key != 'files' and now - alerts[key]['queued'] >= 900)):
             state['pending'].append({'text': '🚨 异常\n' + text, 'due': now, 'tries': 0})
             alerts[key] = {'queued': now, 'text': text}
+            if key == 'files' and file_signature is not None:
+                alerts[key]['signature'] = file_signature
     for key in list(alerts):
         if key not in problems:
             state['pending'].append({'text': '✅ 恢复\n' + alerts.pop(key)['text'], 'due': now, 'tries': 0})
@@ -165,6 +169,12 @@ def maintenance_ignored(path):
     return path == '/etc/vps-watch/config.json' or path == '/opt/vps-watch' or path.startswith('/opt/vps-watch/')
 
 
+def file_change_signature(files, baseline):
+    changes={k:files.get(k) for k in set(files)|set(baseline['files'])
+             if not maintenance_ignored(k) and files.get(k)!=baseline['files'].get(k)}
+    return hashlib.sha256(json.dumps(changes,sort_keys=True).encode()).hexdigest()
+
+
 def evaluate(s, baseline, high):
     problems = {}
     if high >= 3: problems['cpu'] = 'CPU 连续3个采样 >=90%%: %.1f%%' % s['cpu']
@@ -255,7 +265,7 @@ def main():
             if rooted('/etc/vps-watch/test.flag').exists(): problems['exercise']='🧪 无害标记演练，非真实故障'
             if now>=state.get('journal_due',0):
                 journal(state); state['journal_due']=now+30
-            reconcile(state,problems,now)
+            reconcile(state,problems,now,file_change_signature(snap['files'],load(baselinepath)))
             persist()  # Persist cursor AND pending events together before any network send.
             flush(state,lambda text:telegram(config,text),time.time(),persist)
             save(directory/'health.json',{'ok':True,'checked_at':now,'pid':os.getpid(),
