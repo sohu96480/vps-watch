@@ -26,6 +26,19 @@ class DetectionTests(unittest.TestCase):
     def setUp(self):
         spec=importlib.util.spec_from_file_location('watch',P/'watch.py')
         self.w=importlib.util.module_from_spec(spec); spec.loader.exec_module(self.w)
+    def test_ssh_ten_minute_cooldown_persists(self):
+        import json
+        w=self.w; s=w.new_state()
+        w.queue_ssh(s,['first','second'],1000)
+        self.assertEqual(len(s['pending']),1)
+        s=json.loads(json.dumps(s))
+        w.queue_ssh(s,['third'],1599)
+        self.assertEqual(len(s['pending']),1)
+        w.queue_ssh(s,['fourth'],1600)
+        self.assertEqual(len(s['pending']),2)
+        w.queue_ssh(s,[],2200)
+        self.assertEqual(len(s['pending']),2)
+
     def test_socks_transport_keeps_credentials_out_of_argv(self):
         import subprocess,json
         from unittest.mock import patch

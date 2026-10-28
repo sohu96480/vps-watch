@@ -57,6 +57,8 @@ def flush(state, send, now, persist=lambda: None):
             item['tries'] += 1
             item['due'] = now + min(300, 5 * 2 ** min(item['tries'], 6))
             persist(); break
+        if item['text'].startswith('🔐 SSH 登录成功'):
+            state['ssh_last_queued'] = now
         state['pending'].pop(0); persist()
 
 def command(args, allow_failure=False):
@@ -203,6 +205,16 @@ def parse_journal(text, cursor):
         events.append('🔐 SSH 登录成功\n' + detail[:450] + '\n事件时间 ' + stamp)
     return events, cursor
 
+def queue_ssh(state, events, now):
+    if not events: return
+    # Per-host notification throttle; journal cursor still consumes every event.
+    last = state.get('ssh_last_queued')
+    if last is not None and now - last < 600: return
+    if any(item['text'].startswith('🔐 SSH 登录成功') for item in state['pending']): return
+    state['pending'].append({'text':events[0], 'due':now, 'tries':0})
+    state['ssh_last_queued'] = now
+
+
 def journal(state):
     # Unfiltered global cursor prevents gaps when ssh service names or sshd COMM change.
     # COMM filters match both old sshd and modern sshd-session, no --grep.
@@ -219,7 +231,7 @@ def journal(state):
     text = command(args)
     events,cursor = parse_journal(text,state['cursor'])
     state['cursor'] = cursor
-    for event in events: state['pending'].append({'text':event,'due':time.time(),'tries':0})
+    queue_ssh(state, events, time.time())
 
 def main():
     p = argparse.ArgumentParser(description='Notify-only VPS watcher; no claim of a clean host')
