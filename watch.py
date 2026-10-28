@@ -58,7 +58,7 @@ def flush(state, send, now, persist=lambda: None):
             item['due'] = now + min(300, 5 * 2 ** min(item['tries'], 6))
             persist(); break
         if item['text'].startswith('🔐 SSH 登录成功'):
-            state['ssh_last_queued'] = now
+            state.setdefault('ssh_last_by_ip', {})[ssh_source(item['text'])] = now
         state['pending'].pop(0); persist()
 
 def command(args, allow_failure=False):
@@ -205,14 +205,24 @@ def parse_journal(text, cursor):
         events.append('🔐 SSH 登录成功\n' + detail[:450] + '\n事件时间 ' + stamp)
     return events, cursor
 
+def ssh_source(text):
+    import ipaddress, re
+    match = re.search(r'Accepted .*? for .*? from (\S+) port ', text)
+    if not match: return 'unparsed'
+    try: return str(ipaddress.ip_address(match.group(1)))
+    except ValueError: return match.group(1)
+
+
 def queue_ssh(state, events, now):
-    if not events: return
-    # Per-host notification throttle; journal cursor still consumes every event.
-    last = state.get('ssh_last_queued')
-    if last is not None and now - last < 600: return
-    if any(item['text'].startswith('🔐 SSH 登录成功') for item in state['pending']): return
-    state['pending'].append({'text':events[0], 'due':now, 'tries':0})
-    state['ssh_last_queued'] = now
+    last_by_ip = state.setdefault('ssh_last_by_ip', {})
+    for event in events:
+        source = ssh_source(event)
+        last = last_by_ip.get(source)
+        if last is not None and now - last < 600: continue
+        if any(item['text'].startswith('🔐 SSH 登录成功') and ssh_source(item['text']) == source
+               for item in state['pending']): continue
+        state['pending'].append({'text':event, 'due':now, 'tries':0})
+        last_by_ip[source] = now
 
 
 def journal(state):

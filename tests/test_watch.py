@@ -39,6 +39,18 @@ class DetectionTests(unittest.TestCase):
         w.queue_ssh(s,[],2200)
         self.assertEqual(len(s['pending']),2)
 
+    def test_ssh_new_ip_bypasses_other_ip_cooldown(self):
+        w=self.w; s=w.new_state()
+        a='🔐 SSH 登录成功\nAccepted publickey for root from 192.0.2.1 port 12'
+        b='🔐 SSH 登录成功\nAccepted publickey for root from 2001:db8::1 port 13'
+        w.queue_ssh(s,[a,a,b],1000)
+        self.assertEqual(len(s['pending']),2)
+        w.flush(s,lambda text:True,1001)
+        w.queue_ssh(s,[a,b],1200)
+        self.assertFalse(s['pending'])
+        w.queue_ssh(s,[a],1601)
+        self.assertEqual(len(s['pending']),1)
+
     def test_socks_transport_keeps_credentials_out_of_argv(self):
         import subprocess,json
         from unittest.mock import patch
